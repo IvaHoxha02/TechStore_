@@ -4,8 +4,8 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 
 public class MongoDBConnection {
-    private static final String DATABASE_NAME = "your_database_name";
-    private static final String CONNECTION_STRING = "mongodb://localhost:27017";
+    private static final String DATABASE_NAME = "TechStore";
+    private static final String CONNECTION_STRING = "mongodb+srv://ivahoxha28:<ervisi1992>@cluster0.sshkyht.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
     private MongoClient mongoClient;
 
