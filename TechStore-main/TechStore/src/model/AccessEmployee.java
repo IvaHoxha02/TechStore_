@@ -1,99 +1,98 @@
 package model;
 
-import java.io.*;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
+
 import java.util.ArrayList;
 
 public class AccessEmployee {
-    public static final String filename = "Employee.ser";
+    private static final String COLLECTION_NAME = "employeeCollection";
 
-    private ArrayList<Employee> empl = new ArrayList<Employee>();
-    InputStream file, buffer;
-    OutputStream bf, fl;
-    ObjectInput input;
-    ObjectOutput output;
-    File uf = new File(filename);
+    private MongoClient mongoClient;
+    private MongoDatabase database;
+    private MongoCollection<Document> employeeCollection;
 
-    public AccessEmployee(){
-        readF();
+    public AccessEmployee(MongoClient mongoClient, String databaseName) {
+        this.mongoClient = mongoClient;
+        this.database = mongoClient.getDatabase(databaseName);
+        this.employeeCollection = database.getCollection(COLLECTION_NAME);
     }
 
-    public ArrayList<Employee> getEmp()
-    {
-        this.readF();
-        return this.empl;
+    public ArrayList<Employee> getEmp() {
+        // Implement code to retrieve employees from MongoDB
+        return convertMongoDocsToEmployees(employeeCollection.find());
     }
 
+    public void editEmployee(int pos, Employee u) {
+        // Implement code to edit employee in MongoDB
+        Employee existingEmployee = getEmp().get(pos);
+        if (existingEmployee != null) {
+            Document empDocument = new Document("employeeName", u.getEmployeeName())
+                    .append("employeeSurname", u.getEmployeeSurname())
+                    .append("employeeSalary", u.getEmployeeSalary());
 
-    public void editEmployee(int pos, Employee u)
-    {
-        System.out.println(">>>>"+pos);
-        if(pos < 0 || pos >= empl.size())
-        {
-            System.out.println("Cannot find User");
-            return;
-        }
-        else
-        {
-            empl.set(pos, u);
-            this.writeF();
+            employeeCollection.updateOne(
+                    new Document("employeeName", existingEmployee.getEmployeeName())
+                            .append("employeeSurname", existingEmployee.getEmployeeSurname())
+                            .append("employeeSalary", existingEmployee.getEmployeeSalary()),
+                    new Document("$set", empDocument)
+            );
+        } else {
+            System.out.println("Employee not found");
         }
     }
 
     public void addEmp(Employee emp) {
-        empl.add(emp);
-        writeF();
+        // Convert Employee object to MongoDB document
+        Document empDocument = new Document("employeeName", emp.getEmployeeName())
+                .append("employeeSurname", emp.getEmployeeSurname())
+                .append("employeeSalary", emp.getEmployeeSalary());
+
+        // Insert document into MongoDB collection
+        employeeCollection.insertOne(empDocument);
     }
 
+    // Helper method to convert MongoDB documents to Employee objects
+    private ArrayList<Employee> convertMongoDocsToEmployees(Iterable<Document> documents) {
+        ArrayList<Employee> employees = new ArrayList<>();
+        for (Document doc : documents) {
+            employees.add(convertMongoDocToEmployee(doc));
+        }
+        return employees;
+    }
 
-    @SuppressWarnings("unchecked")
+    // Helper method to convert a single MongoDB document to Employee object
+    private Employee convertMongoDocToEmployee(Document document) {
+        return new Employee(
+                document.getString("employeeName"),
+                document.getString("employeeSurname"),
+                document.getDouble("employeeSalary")
+        );
+    }
+
     private void readF() {
-        try {
-            // use buffering
-            file = new FileInputStream(uf);
-            buffer = new BufferedInputStream(file);
-            input = new ObjectInputStream(buffer);
-            // deserialize the List
-            empl = (ArrayList<Employee>) input.readObject();
-            // display its data
-            for (Employee emp : empl) {
-                System.out.println("Data: " + emp.toString());
-            }
-        } catch (ClassNotFoundException ex) {
-            System.out.println("File Not well defined. Creating new file"
-                    + ex.toString());
-        } catch (IOException ex) {
-            System.out.println("Cannot perform input." + ex.toString());
+        // Implement code to read employees from MongoDB collection
+        ArrayList<Employee> employees = getEmp();
+        for (Employee emp : employees) {
+            System.out.println("Data: " + emp.toString());
         }
-        closeFile();
     }
 
-    private void writeF() {
-        // serialize the List
-        try {
-            fl = new FileOutputStream(uf);
-            bf = new BufferedOutputStream(fl);
-            output = new ObjectOutputStream(bf);
-            output.writeObject(empl);
-        } catch (IOException ex) {
-            System.out.println("Cannot perform output." + ex.toString());
+    private void writeF(ArrayList<Employee> employees) {
+        // Implement code to write employees to MongoDB collection
+        for (Employee emp : employees) {
+            Document empDocument = new Document("employeeName", emp.getEmployeeName())
+                    .append("employeeSurname", emp.getEmployeeSurname())
+                    .append("employeeSalary", emp.getEmployeeSalary());
+
+            employeeCollection.insertOne(empDocument);
         }
-        closeFile();
     }
 
     public void closeFile() {
-        try {
-            if (input != null) {
-                input.close();
-                buffer.close();
-                file.close();
-            }
-            if (output != null) {
-                output.close();
-                bf.close();
-                fl.close();
-            }
-        } catch (IOException e) {
-            System.out.println(e.toString());
-        }
+        // Close MongoDB-related resources if needed
+        mongoClient.close();
     }
 }
