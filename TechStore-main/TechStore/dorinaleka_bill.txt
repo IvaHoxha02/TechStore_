@@ -1,0 +1,5 @@
+CUSTOMER ->dorinaleka
+PRODUCT ID ->3
+PRODUCT PRICE ->1.0E7$
+ORDERED ->1 pieces
+TO PAY ->1.0E7$
