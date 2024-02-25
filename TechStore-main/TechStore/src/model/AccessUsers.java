@@ -1,156 +1,121 @@
 package model;
 
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 
 public class AccessUsers {
-    //
-    public static final String filename = "Users.ser";
+    private static final String COLLECTION_NAME = "userCollection";
 
-    private ArrayList<User> users = new ArrayList<User>();
-    InputStream file, buffer;
-    OutputStream bf, fl;
-    ObjectInput input;
-    ObjectOutput output;
-    File uf = new File(filename);
+    private MongoClient mongoClient;
+    private MongoDatabase database;
+    private MongoCollection<Document> userCollection;
 
-    public AccessUsers() {
-        readF();
+    public AccessUsers(MongoClient mongoClient, String databaseName) {
+        this.mongoClient = mongoClient;
+        this.database = mongoClient.getDatabase(databaseName);
+        this.userCollection = database.getCollection(COLLECTION_NAME);
     }
 
     public User checkUser(String user, String pass) {
-        for (User x : users)
-            if (x.getUser().equals(user) && x.getPass().equals(pass)) {
-                return x;
-            }
-        return null;
+        Document query = new Document("user", user).append("pass", pass);
+        Document userDocument = userCollection.find(query).first();
+        return userDocument != null ? convertMongoDocToUser(userDocument) : null;
     }
 
     public void addUser(User user) {
-        users.add(user);
-        writeF();
+        // Convert User object to MongoDB document
+        Document userDocument = user.toDocument();
+
+        // Insert document into MongoDB collection
+        userCollection.insertOne(userDocument);
     }
 
     public String readS() {
-        readF();
-        String read = "";
-        for (User x : users)
-            read += "\n-------------User " + x.getid()
-                    + "--------------------\n" + x.toString()
-                    + "\n>---------------------------<\n";
-        return read;
+        ArrayList<User> users = getUsers();
+        StringBuilder read = new StringBuilder();
+        for (User user : users) {
+            read.append("\n-------------User ").append(user.getid())
+                    .append("--------------------\n").append(user.toString())
+                    .append("\n>---------------------------<\n");
+        }
+        return read.toString();
     }
 
-    public ArrayList<User> getUsers()
-    {
-        this.readF();
-        return this.users;
+    public ArrayList<User> getUsers() {
+        // Implement code to retrieve users from MongoDB
+        return convertMongoDocsToUsers(userCollection.find());
     }
 
     public void rm(int id) {
-        boolean rm = false;
-        for (User x : users)
-            if (x.getid() == id) {
-                rm = true;
-                users.remove(users.indexOf(x));
-            }
-        if (!rm)
-            System.out.println("Not Found");
+        // Implement code to remove user from MongoDB based on ID
+        userCollection.deleteOne(new Document("id", id));
     }
 
-    public int getPosition(User u)
-    {
-        //this.readF();
-        System.out.println("--------------");
-        System.out.println(u);
-        System.out.println("--------------");
-        for(int i=0; i<users.size(); i++)
-        {
-            if(users.get(i).toString().equals(u.toString()))
+    public int getPosition(User u) {
+        ArrayList<User> users = getUsers();
+        for (int i = 0; i < users.size(); i++) {
+            if (users.get(i).toString().equals(u.toString())) {
                 return i;
+            }
         }
-
         return -1;
     }
 
-    public void editUser(int pos, User u)
-    {
-        System.out.println(">>>>"+pos);
-        if(pos < 0 || pos >= users.size())
-        {
-            System.out.println("Cannot find User");
-            return;
-        }
-        else
-        {
-            users.set(pos, u);
-            this.writeF();
+    public void editUser(int pos, User u) {
+        User existingUser = getUsers().get(pos);
+        if (existingUser != null) {
+            Document userDocument = u.toDocument();
+
+            userCollection.updateOne(
+                    new Document("id", existingUser.getid()),
+                    new Document("$set", userDocument)
+            );
+        } else {
+            System.out.println("User not found");
         }
     }
 
-    @SuppressWarnings("unchecked")
+    // Helper method to convert MongoDB documents to User objects
+    private ArrayList<User> convertMongoDocsToUsers(Iterable<Document> documents) {
+        ArrayList<User> users = new ArrayList<>();
+        for (Document doc : documents) {
+            users.add(convertMongoDocToUser(doc));
+        }
+        return users;
+    }
+
+    // Helper method to convert a single MongoDB document to User object
+    private User convertMongoDocToUser(Document document) {
+        return new User(
+                document.getInteger("id"),
+                document.getString("user"),
+                document.getString("pass"),
+                document.getInteger("level")
+        );
+    }
+
     private void readF() {
-        try {
-            // use buffering
-            file = new FileInputStream(uf);
-            buffer = new BufferedInputStream(file);
-            input = new ObjectInputStream(buffer);
-            // deserialize the List
-            users = (ArrayList<User>) input.readObject();
-            // display its data
-            for (User user : users) {
-                System.out.println("Data: " + user.toString());
-            }
-        } catch (ClassNotFoundException ex) {
-            System.out.println("Not found. Creating new file"
-                    + ex.toString());
-            addUser(new User(0,"admin","admin",1));
-        } catch (IOException ex) {
-            System.out.println("Cannot perform input." + ex.toString());
+        ArrayList<User> users = convertMongoDocsToUsers(userCollection.find());
+        for (User user : users) {
+            System.out.println("Data: " + user.toString());
         }
-        closeFile();
     }
 
-    private void writeF() {
-        // TODO Auto-generated method stub
-        // serialize the List
-        try {
-            fl = new FileOutputStream(uf);
-            bf = new BufferedOutputStream(fl);
-            output = new ObjectOutputStream(bf);
-            output.writeObject(users);
-        } catch (IOException ex) {
-            System.out.println("Cannot perform output." + ex.toString());
+
+    private void writeF(ArrayList<User> users) {
+        // Implement code to write users to MongoDB collection
+        for (User user : users) {
+            Document userDocument = user.toDocument();
+            userCollection.insertOne(userDocument);
         }
-        closeFile();
     }
 
     public void closeFile() {
-        try {
-            if (input != null) {
-                input.close();
-                buffer.close();
-                file.close();
-            }
-            if (output != null) {
-                output.close();
-                bf.close();
-                fl.close();
-            }
-        } catch (IOException e) {
-            System.out.println(e.toString());
-        }
+        // Close MongoDB-related resources if needed
+        mongoClient.close();
     }
 }
