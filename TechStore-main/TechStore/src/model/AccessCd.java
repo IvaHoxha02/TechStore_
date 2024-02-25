@@ -1,108 +1,91 @@
 package model;
 
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
 
-import java.io.*;
 import java.util.ArrayList;
-import java.util.Iterator;
 
 public class AccessCd {
-    public static final String filename = "CD.ser";
+    private static final String COLLECTION_NAME = "cdCollection";
 
-    private ArrayList<CD> cd = new ArrayList<CD>();
-    InputStream file, buffer;
-    OutputStream bf, fl;
-    ObjectInput input;
-    ObjectOutput output;
-    File uf = new File(filename);
+    private MongoClient mongoClient;
+    private MongoDatabase database;
+    private MongoCollection<Document> cdCollection;
 
-    public AccessCd(){
-        readF();
+    public AccessCd(MongoClient mongoClient, String databaseName) {
+        this.mongoClient = mongoClient;
+        this.database = mongoClient.getDatabase(databaseName);
+        this.cdCollection = database.getCollection(COLLECTION_NAME);
     }
 
-
-    public ArrayList<CD> getCd()
-    {
-        this.readF();
-        return this.cd;
+    public ArrayList<CD> getCd() {
+        // Implement code to retrieve CDs from MongoDB
+        return convertMongoDocsToCDs(cdCollection.find());
     }
 
+    public void addCd(CD cd) {
+        // Convert CD object to MongoDB document
+        Document cdDocument = cd.toDocument();
 
-    public void addCd(CD emp) {
-        cd.add(emp);
-        writeF();
+        // Insert document into MongoDB collection
+        cdCollection.insertOne(cdDocument);
     }
-
 
     public void rm(int id) {
-        ObservableList<CD> cdList = FXCollections.observableArrayList(getCd());
-        for (Iterator<CD> iterator = cdList.iterator(); iterator.hasNext();) {
-            CD x = iterator.next();
-            if (x.getCdId() == id) {
-                iterator.remove();
-            }
-        }
-        cd = new ArrayList<>(cdList); // Update the underlying ArrayList
-        writeF();
+        // Implement code to remove CD from MongoDB based on ID
+        cdCollection.deleteOne(new Document("cdId", id));
     }
 
-    public void editCdQuant(int quant,CD c){
-        c.setCdQuantity(quant);
-        this.writeF();
+    public void editCdQuant(int quant, CD c) {
+        // Implement code to edit CD quantity in MongoDB
+        cdCollection.updateOne(
+                new Document("cdId", c.getCdId()),
+                new Document("$set", new Document("cdQuantity", quant))
+        );
     }
 
-
-
-    @SuppressWarnings("unchecked")
-    private void readF() {
-        try {
-            // use buffering
-            file = new FileInputStream(uf);
-            buffer = new BufferedInputStream(file);
-            input = new ObjectInputStream(buffer);
-            // deserialize the List
-            cd = (ArrayList<CD>) input.readObject();
-            // display its data
-            for (CD emp : cd) {
-                System.out.println("Data: " + emp.toString());
-            }
-        } catch (ClassNotFoundException ex) {
-            System.out.println("File Not well defined. Creating new file"
-                    + ex.toString());
-        } catch (IOException ex) {
-            System.out.println("Cannot perform input." + ex.toString());
+    // Helper method to convert MongoDB documents to CD objects
+    private ArrayList<CD> convertMongoDocsToCDs(Iterable<Document> documents) {
+        ArrayList<CD> cds = new ArrayList<>();
+        for (Document doc : documents) {
+            cds.add(convertMongoDocToCD(doc));
         }
-        closeFile();
+        return cds;
     }
 
-    private void writeF() {
-        // serialize the List
-        try {
-            fl = new FileOutputStream(uf);
-            bf = new BufferedOutputStream(fl);
-            output = new ObjectOutputStream(bf);
-            output.writeObject(cd);
-        } catch (IOException ex) {
-            System.out.println("Cannot perform output." + ex.toString());
+    // Helper method to convert a single MongoDB document to CD object
+    private CD convertMongoDocToCD(Document document) {
+        return new CD(
+                document.getString("cdName"),
+                document.getString("cdCategory"),
+                document.getDouble("cdPrice"),
+                document.getInteger("cdYear"),
+                document.getInteger("cdQuantity"),
+                document.getLong("cdUPC"),
+                document.getString("cdAuthor"),
+                document.getInteger("cdId")
+        );
+    }
+
+     private void readF() {
+         ArrayList<CD> cds = convertMongoDocsToCDs(cdCollection.find());
+         for (CD cd : cds) {
+             System.out.println("Data: " + cd.toString());
+         }
+     }
+
+    private void writeF(ArrayList<CD> cds) {
+        // Implement code to write CDs to MongoDB collection
+        for (CD cd : cds) {
+            Document cdDocument = cd.toDocument();
+            cdCollection.insertOne(cdDocument);
         }
-        closeFile();
     }
 
     public void closeFile() {
-        try {
-            if (input != null) {
-                input.close();
-                buffer.close();
-                file.close();
-            }
-            if (output != null) {
-                output.close();
-                bf.close();
-                fl.close();
-            }
-        } catch (IOException e) {
-            System.out.println(e.toString());
-        }
+        // Close MongoDB-related resources if needed
+        mongoClient.close();
     }
 }
